@@ -1,0 +1,150 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import requests
+import json
+
+class CurrencyConverterApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Currency Converter")
+        self.root.geometry("600x500")
+
+        # Файл истории
+        self.history_file = "history.json"
+
+        # Создаём интерфейс
+        self.create_widgets()
+
+        # Загружаем курсы валют
+        self.fetch_exchange_rates()
+
+        # Загружаем историю
+        self.load_history()
+
+    def create_widgets(self):
+        # Выбор валюты "из"
+        tk.Label(self.root, text="Из валюты:").grid(row=0, column=0, padx=10, pady=10)
+        self.from_currency = ttk.Combobox(self.root, values=[])
+        self.from_currency.grid(row=0, column=1, padx=10, pady=10)
+
+        # Выбор валюты "в"
+        tk.Label(self.root, text="В валюту:").grid(row=1, column=0, padx=10, pady=10)
+        self.to_currency = ttk.Combobox(self.root, values=[])
+        self.to_currency.grid(row=1, column=1, padx=10, pady=10)
+
+        # Поле ввода суммы
+        tk.Label(self.root, text="Сумма:").grid(row=2, column=0, padx=10, pady=10)
+        self.amount_entry = tk.Entry(self.root)
+        self.amount_entry.grid(row=2, column=1, padx=10, pady=10)
+
+        # Кнопка конвертации
+        self.convert_button = tk.Button(self.root, text="Конвертировать", command=self.convert)
+        self.convert_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+        # Таблица истории
+        self.history_tree = ttk.Treeview(self.root, columns=("From", "To", "Amount", "Result"), show="headings")
+        self.history_tree.heading("From", text="Из валюты")
+        self.history_tree.heading("To", text="В валюту")
+        self.history_tree.heading("Amount", text="Сумма")
+        self.history_tree.heading("Result", text="Результат")
+        self.history_tree.grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+
+        # Настройка растягивания таблицы
+        self.root.grid_rowconfigure(4, weight=1)
+        self.root.grid_columnconfigure(1, weight=1)
+
+    def fetch_exchange_rates(self):
+        api_key = "YOUR_API_KEY"  # Замените на ваш API-ключ
+        url = f"https://api.exchangerate-api.com/v4/latest/USD"
+
+        try:
+            response = requests.get(url)
+            data = response.json()
+            self.currencies = list(data['rates'].keys())
+            self.from_currency['values'] = self.currencies
+            self.to_currency['values'] = self.currencies
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось получить курсы валют: {e}")
+
+    def convert(self):
+        try:
+            amount = float(self.amount_entry.get())
+            if amount <= 0:
+                messagebox.showerror("Ошибка", "Сумма должна быть положительным числом")
+                return
+
+            from_curr = self.from_currency.get()
+            to_curr = self.to_currency.get()
+
+            if not from_curr or not to_curr:
+                messagebox.showerror("Ошибка", "Выберите валюты")
+                return
+
+            # Получаем курс через API
+            api_key = "YOUR_API_KEY"
+            url = f"https://api.exchangerate-api.com/v4/latest/{from_curr}"
+            response = requests.get(url)
+            data = response.json()
+
+            rate = data['rates'][to_curr]
+            result = amount * rate
+
+            # Добавляем в историю
+            self.add_to_history(from_curr, to_curr, amount, result)
+
+            messagebox.showinfo("Результат", f"{amount} {from_curr} = {result:.2f} {to_curr}")
+
+        except ValueError:
+            messagebox.showerror("Ошибка", "Введите корректную сумму")
+        except KeyError:
+            messagebox.showerror("Ошибка", "Не удалось получить курс для выбранных валют")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Произошла ошибка: {e}")
+
+
+    def add_to_history(self, from_curr, to_curr, amount, result):
+        history_entry = {
+            "from": from_curr,
+            "to": to_curr,
+            "amount": amount,
+            "result": result
+        }
+
+        try:
+            with open(self.history_file, 'r') as f:
+                history = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            history = []
+
+        history.append(history_entry)
+
+        with open(self.history_file, 'w') as f:
+            json.dump(history, f, indent=4)
+
+        # Обновляем таблицу
+        self.update_history_table()
+
+    def load_history(self):
+        try:
+            with open(self.history_file, 'r') as f:
+                history = json.load(f)
+                for entry in history:
+                    self.history_tree.insert("", "end", values=(
+                        entry["from"],
+                        entry["to"],
+                        entry["amount"],
+                        f"{entry['result']:.2f}"
+                    ))
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    def update_history_table(self):
+        # Очищаем таблицу
+        for item in self.history_tree.get_children():
+            self.history_tree.delete(item)
+        self.load_history()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = CurrencyConverterApp(root)
+    root.mainloop()
