@@ -1,0 +1,14 @@
+[
+    {
+        "from": "USD",
+        "to": "AED",
+        "amount": 100.0,
+        "result": 367.0
+    },
+    {
+        "from": "AMD",
+        "to": "AUD",
+        "amount": 100.0,
+        "result": 0.375
+    }
+]
